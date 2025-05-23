@@ -9,7 +9,8 @@ def calculate_aac(sequence):
     sequence = sequence.upper()
     length = len(sequence)
     count = Counter(sequence)
-    return {f"AAC_{aa}": count.get(aa, 0) / length for aa in AMINO_ACIDS}
+    # 小寫欄位名稱：aac_a
+    return {f"aac_{aa.lower()}": count.get(aa, 0) / length for aa in AMINO_ACIDS}
 
 def calculate_dpc(sequence):
     sequence = sequence.upper()
@@ -19,15 +20,13 @@ def calculate_dpc(sequence):
         if all(aa in AMINO_ACIDS for aa in dipeptide):
             dpc_count[dipeptide] += 1
     total = sum(dpc_count.values())
-    # DPC欄位順序要跟CSV一致，兩層for排列
     dpc_features = {}
     for a1 in AMINO_ACIDS:
         for a2 in AMINO_ACIDS:
-            key = f"DPC_{a1}{a2}"
+            key = f"dpc_{a1.lower()}{a2.lower()}"
             dpc_features[key] = dpc_count.get(a1 + a2, 0) / total if total > 0 else 0
     return dpc_features
 
-# 載入模型
 model = load("svm_model.pkl")
 
 st.title("SNARE Protein Predictor")
@@ -42,7 +41,7 @@ if st.button("預測"):
         try:
             aac_features = calculate_aac(seq_input)
             dpc_features = calculate_dpc(seq_input)
-            features = {**aac_features, **dpc_features}  # 合併字典
+            features = {**aac_features, **dpc_features}
 
             X_input = pd.DataFrame([features])
             prediction = model.predict(X_input)[0]
