@@ -9,7 +9,7 @@ import joblib
 # 載入預訓練模型（請確認這個檔案已經在 GitHub repo 裡）
 @st.cache_resource
 def load_model():
-    return joblib.load("train_model.pkl")
+    return joblib.load("trained_model.pkl")
 
 # 特徵擷取（示範：AAC）
 def extract_feature_vector(seq):
