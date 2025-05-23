@@ -21,8 +21,9 @@ def extract_feature_vector(seq):
     return [c / total for c in counts]
 
 # 從 FASTA 檔讀入並轉成特徵矩陣
-def extract_features_from_fasta(fasta_file):
-    fasta_text = io.StringIO(fasta_file.getvalue().decode("utf-8"))
+def extract_features_from_fasta(uploaded_file):
+    # 將 binary 檔案轉為文字檔案
+    fasta_text = io.StringIO(uploaded_file.read().decode("utf-8"))
 
     ids = []
     features = []
@@ -58,7 +59,3 @@ if uploaded_file:
         "text/csv",
         key="download-csv"
     )
-
-
-
-
