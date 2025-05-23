@@ -7,7 +7,7 @@ AMINO_ACIDS = 'ACDEFGHIKLMNPQRSTVWY'
 def calculate_aac(sequence):
     sequence = sequence.upper()
     length = len(sequence)
-    return {aa: sequence.count(aa) / length for aa in AMINO_ACIDS}
+    return {f"aac_{aa}": sequence.count(aa) / length for aa in 'ACDEFGHIKLMNPQRSTVWY'}
 
 # 載入模型
 model = load("svm_model.pkl")
