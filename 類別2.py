@@ -1,61 +1,39 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import io
-from Bio import SeqIO
-from sklearn.ensemble import RandomForestClassifier
-import joblib
+from joblib import load
 
-# 載入預訓練模型（請確認這個檔案已經在 GitHub repo 裡）
-@st.cache_resource
-def load_model():
-    return joblib.load("trained_model.pkl")
+AMINO_ACIDS = 'ACDEFGHIKLMNPQRSTVWY'
 
-# 特徵擷取（示範：AAC）
-def extract_feature_vector(seq):
-    amino_acids = "ACDEFGHIKLMNPQRSTVWY"
-    counts = [seq.count(aa) for aa in amino_acids]
-    total = sum(counts)
-    if total == 0:
-        return [0] * 20
-    return [c / total for c in counts]
+def calculate_aac(sequence):
+    sequence = sequence.upper()
+    length = len(sequence)
+    return {aa: sequence.count(aa) / length for aa in AMINO_ACIDS}
 
-# 從 FASTA 檔讀入並轉成特徵矩陣
-def extract_features_from_fasta(uploaded_file):
-    # 將 binary 檔案轉為文字檔案
-    fasta_text = io.StringIO(uploaded_file.read().decode("utf-8"))
+# 載入模型
+model = load("svm_model.pkl")
 
-    ids = []
-    features = []
-
-    for record in SeqIO.parse(fasta_text, "fasta"):
-        ids.append(record.id)
-        features.append(extract_feature_vector(str(record.seq)))
-
-    return ids, features
-
-# 網頁介面
+# Streamlit UI
 st.title("SNARE Protein Predictor")
-st.write("上傳 FASTA 序列，我們將幫你預測是否為 SNARE 蛋白。")
+st.write("輸入蛋白質序列（單一條）：")
 
-uploaded_file = st.file_uploader("選擇 FASTA 檔案", type=["fasta", "fa"])
+seq_input = st.text_area("貼上序列（A-Z）：", height=150)
 
-if uploaded_file:
-    ids, features = extract_features_from_fasta(uploaded_file)
-    model = load_model()
-    preds = model.predict(features)
-    
-    df = pd.DataFrame({"ID": ids, "Prediction": preds})
-    df["Prediction"] = df["Prediction"].map({1: "SNARE", 0: "NOT_SNARE"})
+if st.button("預測"):
+    if not seq_input.strip():
+        st.warning("請輸入序列")
+    else:
+        try:
+            features = calculate_aac(seq_input)
+            X_input = pd.DataFrame([features])
+            prediction = model.predict(X_input)[0]
+            prob = model.predict_proba(X_input)[0][prediction]
 
-    st.success("預測完成！")
-    st.dataframe(df)
+            if prediction == 1:
+                st.success(f"✅ 預測結果：這是一條 SNARE 蛋白（信心值 {prob:.2f}）")
+            else:
+                st.info(f"❌ 預測結果：這不是 SNARE 蛋白（信心值 {prob:.2f}）")
+        except Exception as e:
+            st.error(f"發生錯誤：{e}")
 
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "下載預測結果 CSV",
-        csv,
-        "snare_predictions.csv",
-        "text/csv",
-        key="download-csv"
-    )
+
+
