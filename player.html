@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <title>HLS 自動畫質切換（平滑版）</title>
+  <style>
+    #info {
+      margin-top: 10px;
+      font-family: Arial, sans-serif;
+    }
+    button {
+      margin: 0 5px;
+      padding: 5px 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <video id="video" controls width="640" height="360"loop></video>
+
+  <div id="info">
+    <div>目前畫質：<span id="quality">-</span></div>
+    <div>網速 Mbps：<span id="speed">-</span></div>
+    <div>
+      手動切換畫質：
+      <button onclick="setQuality(0)">240p</button>
+      <button onclick="setQuality(1)">360p</button>
+      <button onclick="setQuality(2)">720p</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script>
+    const video = document.getElementById('video');
+    const qualityEl = document.getElementById('quality');
+    const speedEl = document.getElementById('speed');
+
+    let hls;
+    let manualQuality = false;
+    let currentAutoLevel = -1;
+
+    if (Hls.isSupported()) {
+      hls = new Hls({
+        autoStartLoad: true,
+        capLevelToPlayerSize: true,
+        startLevel: 0 // 預設從360p開始
+      });
+      hls.loadSource('master.m3u8');  // 你的 master playlist
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        video.play();
+        updateQualityDisplay(hls.currentLevel);
+      });
+
+      hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
+        updateQualityDisplay(data.level);
+      });
+    } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = 'master.m3u8';
+      video.addEventListener('loadedmetadata', () => {
+        video.play();
+      });
+    } else {
+      alert('瀏覽器不支援 HLS 播放');
+    }
+
+    function updateQualityDisplay(level) {
+      if (!hls) return;
+      const height = hls.levels[level] ? hls.levels[level].height : '未知';
+      qualityEl.textContent = height + 'p';
+    }
+
+    function setQuality(level) {
+      if (!hls) return;
+      manualQuality = true;
+      hls.currentLevel = level;
+      updateQualityDisplay(level);
+    }
+
+    // 自動畫質切換邏輯（加平滑判斷）
+    function updateAutoQuality(avgSpeed) {
+      let newLevel;
+      if (avgSpeed < 20) {
+        newLevel = 0;
+      } else if (avgSpeed < 21) {
+        newLevel = 1;
+      } else {
+        newLevel = 2;
+      }
+
+      if (newLevel !== currentAutoLevel) {
+        hls.currentLevel = newLevel;
+        currentAutoLevel = newLevel;
+        updateQualityDisplay(newLevel);
+      }
+    }
+
+    // 測速邏輯（多次平均）
+    const SPEED_SAMPLES = 5;
+    let speedResults = [];
+
+    async function measureSpeed() {
+      const testUrl = `test_720p.ts?nocache=${Date.now()}`;
+      const startTime = performance.now();
+      try {
+        const response = await fetch(testUrl, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        const blob = await response.blob();
+        const duration = performance.now() - startTime;
+        const mbps = (blob.size * 8) / (duration / 1000) / 1000000;
+
+        speedResults.push(mbps);
+        if (speedResults.length > SPEED_SAMPLES) {
+          speedResults.shift();
+        }
+
+        const avgSpeed = speedResults.reduce((a, b) => a + b, 0) / speedResults.length;
+        speedEl.textContent = avgSpeed.toFixed(2);
+
+        if (!manualQuality) {
+          updateAutoQuality(avgSpeed);
+        }
+      } catch (e) {
+        speedEl.textContent = '測速失敗';
+        console.error(e);
+      }
+    }
+
+    setInterval(measureSpeed, 5000);
+    measureSpeed();
+  </script>
+
+</body>
+</html>
+
